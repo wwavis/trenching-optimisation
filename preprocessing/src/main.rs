@@ -1,18 +1,11 @@
-use shapefile;
+use shapefile_to_geojson::convert_shapefile_to_geojson;
+use anyhow::Result;
 
-fn main() {
-    println!("Preprocessing");
-
-    let filename = "../../real_sitedata/Wingerworth/features_wingerworth.shp";
-    let mut reader = shapefile::Reader::from_path(filename).unwrap();
-
-    for result in reader.iter_shapes_and_records() {
-        let (shape, record) = result.unwrap();
-        println ! ("Shape: {}, records: ", shape);
-        for (name, value) in record {
-            println ! ("\t{}: {:?}, ", name, value);
-        }
-        println ! ();
-    }
-
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    
+    let args: Vec<String> = std::env::args().collect();
+    convert_shapefile_to_geojson(&args[1], &args[2]).await?;
+    // convert_shapefile_to_geojson("../../Trenchscrits/real_sitedata/Wingerworth/features_wingerworth.shp", "../data/features_wingerworth.geojson").await?;
+    Ok(())
 }
