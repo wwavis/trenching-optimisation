@@ -80,11 +80,11 @@ fn save_feature_collection_to_geojson(
     index: usize,
 ) -> Result<()> {
     fs_err::create_dir_all(format!(
-        "../../data/grouped_by_LOE/{}/{}",
+        "../../data/grouped_by_loe/{}/{}",
         folder_name, index
     ))?;
     let file = File::create(format!(
-        "../../data/grouped_by_LOE/{}/{}/features.geojson",
+        "../../data/grouped_by_loe/{}/{}/features.geojson",
         folder_name, index
     ))?;
     let writer = BufWriter::new(file);
@@ -99,11 +99,11 @@ fn save_feature_collection_to_geojson(
 
 fn save_feature_to_geojson(feature: Feature, folder_name: &String, index: usize) -> Result<()> {
     fs_err::create_dir_all(format!(
-        "../../data/grouped_by_LOE/{}/{}",
+        "../../data/grouped_by_loe/{}/{}",
         folder_name, index
     ))?;
     let file = File::create(format!(
-        "../../data/grouped_by_LOE/{}/{}/LOE.geojson",
+        "../../data/grouped_by_loe/{}/{}/loe.geojson",
         folder_name, index
     ))?;
     let writer = BufWriter::new(file);

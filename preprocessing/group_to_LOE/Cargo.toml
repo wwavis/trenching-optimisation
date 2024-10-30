@@ -1,5 +1,5 @@
 [package]
-name = "group_to_LOE"
+name = "group_to_loe"
 version = "0.1.0"
 edition = "2021"
 
