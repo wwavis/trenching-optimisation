@@ -9,8 +9,11 @@ use trenching_optimisation::{read_features_geojson, TrenchPattern};
 fn main() {
     let now = Instant::now();
 
-    let trenches = trench::new_trench_layout("centre_line_trenching".to_string());
-    let features = read_features_geojson(format!("wingerworth"), format!("{}", 0)).unwrap();
+    let site_name = format!("wingerworth");
+    let loe_i = format!("{}", 0);
+
+    let trenches = trench::new_trench_layout("centre_line_trenching".to_string(), &site_name, &loe_i);
+    let features = read_features_geojson(site_name, loe_i).unwrap();
     process_geojson(&features, &trenches.unwrap());
 
     let elapsed_time = now.elapsed();

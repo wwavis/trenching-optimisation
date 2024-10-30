@@ -1,6 +1,5 @@
 use geo::{Intersects, Polygon};
 use trenching_optimisation::TrenchPattern;
-// use geo::line_string;
 
 pub fn test(polygon_a: Polygon<f64>, trenches: &TrenchPattern) -> bool {
     match trenches {

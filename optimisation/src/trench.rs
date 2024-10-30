@@ -2,8 +2,8 @@ use geo::{coord, Area, BooleanOps, Coord, LineString, Polygon};
 use geojson::{Geometry, Value};
 use trenching_optimisation::{read_loe_feature, TrenchPattern};
 
-pub fn new_trench_layout(trench_type: String) -> Option<TrenchPattern> {
-    let loe = read_loe_feature(format!("wingerworth"), format!("{}", 0)).unwrap();
+pub fn new_trench_layout(trench_type: String, site_name: &String, loe_i: &String) -> Option<TrenchPattern> {
+    let loe = read_loe_feature(site_name.clone(), loe_i.clone()).unwrap();
     match loe.geometry {
         Some(ref geom) => match create_trenches(geom, &trench_type) {
             Some(trenches) => {
