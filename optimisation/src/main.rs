@@ -1,23 +1,30 @@
 mod intersects;
-use trenching_optimisation::read_geojson;
+mod trench;
+
+use geo::{coord, Coord, LineString, Polygon};
 use geojson::{GeoJson, Geometry, Value};
-use geo::{Polygon, LineString, Coord, coord};
+use std::time::Instant;
+use trenching_optimisation::{read_features_geojson, TrenchPattern};
 
 fn main() {
-    println!("Solve the trenching optimisation problem");
-    // intersects::test();
-    let gj = read_geojson().unwrap();
-    process_geojson(&gj);
+    let now = Instant::now();
+
+    let trenches = trench::new_trench_layout("centre_line_trenching".to_string());
+    let features = read_features_geojson(format!("wingerworth"), format!("{}", 0)).unwrap();
+    process_geojson(&features, &trenches.unwrap());
+
+    let elapsed_time = now.elapsed();
+    println!("Elapsed time: {:?}", elapsed_time);
 }
 
-fn process_geojson(gj: &GeoJson) {
+fn process_geojson(gj: &GeoJson, trenches: &TrenchPattern) {
     match *gj {
-        GeoJson::FeatureCollection(ref ctn) => {
+        GeoJson::FeatureCollection(ref collection) => {
             let mut matched = 0;
             let mut unmatched = 0;
-            for feature in &ctn.features {
+            for feature in &collection.features {
                 if let Some(ref geom) = feature.geometry {
-                    if match_geometry(geom) {
+                    if match_geometry(geom, &trenches) {
                         matched += 1;
                     } else {
                         unmatched += 1;
@@ -30,25 +37,27 @@ fn process_geojson(gj: &GeoJson) {
     }
 }
 
-/// Process GeoJSON geometries
-fn match_geometry(geom: &Geometry) -> bool {
+// Process GeoJSON geometries
+fn match_geometry(geom: &Geometry, trenches: &TrenchPattern) -> bool {
     match geom.value {
         Value::Polygon(ref polygon) => {
-            let poly1 = polygon[0].iter().map(|c| {
-                coord! { x: c[0], y: c[1] }
-            }).collect::<Vec<Coord>>();
+            let poly1 = polygon[0]
+                .iter()
+                .map(|c| {
+                    coord! { x: c[0], y: c[1] }
+                })
+                .collect::<Vec<Coord>>();
             let poly = Polygon::new(LineString(poly1), vec![]);
-            if intersects::test(poly) {
+            if intersects::test(poly, trenches) {
                 true
             } else {
                 false
             }
-
-        },
+        }
         _ => {
             // TODO: update this placeholder for other geometry types
             println!("Matched some other geometry");
-            false 
-        },
+            false
+        }
     }
 }
