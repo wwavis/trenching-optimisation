@@ -1,5 +1,5 @@
 [package]
-name = "trenching-preprocessing"
+name = "convert_shapefiles_to_geojson"
 version = "0.1.0"
 edition = "2021"
 
