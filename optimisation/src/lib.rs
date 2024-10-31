@@ -14,7 +14,8 @@ pub fn read_features_geojson(site_name: String, loe_i: String) -> Result<GeoJson
     let file = File::open(format!(
         "../data/grouped_by_loe/{}/{}/features.geojson",
         site_name, loe_i
-    ))?;    let reader = BufReader::new(file);
+    ))?;
+    let reader = BufReader::new(file);
     let gj: GeoJson = serde_json::from_reader(reader)?;
     Ok(gj)
 }

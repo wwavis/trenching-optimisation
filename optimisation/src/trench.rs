@@ -1,8 +1,12 @@
-use geo::{coord, Area, BooleanOps, Coord, LineString, Polygon};
+use geo::{coord, Area, BooleanOps, LineString, Polygon};
 use geojson::{Geometry, Value};
 use trenching_optimisation::{read_loe_feature, TrenchPattern};
 
-pub fn new_trench_layout(trench_type: String, site_name: &String, loe_i: &String) -> Option<TrenchPattern> {
+pub fn new_trench_layout(
+    trench_type: String,
+    site_name: &String,
+    loe_i: &String,
+) -> Option<TrenchPattern> {
     let loe = read_loe_feature(site_name.clone(), loe_i.clone()).unwrap();
     match loe.geometry {
         Some(ref geom) => match create_trenches(geom, &trench_type) {
@@ -29,7 +33,7 @@ fn create_trenches(geom: &Geometry, trench_type: &String) -> Option<TrenchPatter
                 .map(|c| {
                     coord! { x: c[0], y: c[1] }
                 })
-                .collect::<Vec<Coord>>();
+                .collect();
             let site_outline = Polygon::new(LineString(polygon_exterior), vec![]);
             if trench_type == "centre_line_trenching" {
                 return Some(centre_line_trenching(&site_outline));
@@ -54,8 +58,8 @@ fn centre_line_trenching(site_outline: &Polygon) -> TrenchPattern {
 
     let percentage_coverage = intersection.unsigned_area() / site_outline.unsigned_area() * 100.0;
 
-    println!("intersection area: {}", intersection.unsigned_area());
-    println!("site outline area: {}", site_outline.unsigned_area());
+    println!("Trench area: {:.2}m^2", intersection.unsigned_area());
+    println!("LOE area: {:.2}m^2", site_outline.unsigned_area());
 
     println!("Percentage coverage: {:.2}%", percentage_coverage);
     TrenchPattern::CentreLine(intersection)

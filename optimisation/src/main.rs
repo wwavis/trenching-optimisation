@@ -1,7 +1,7 @@
 mod intersects;
 mod trench;
 
-use geo::{coord, Coord, LineString, Polygon};
+use geo::{coord, LineString, Polygon};
 use geojson::{GeoJson, Geometry, Value};
 use std::time::Instant;
 use trenching_optimisation::{read_features_geojson, TrenchPattern};
@@ -12,7 +12,8 @@ fn main() {
     let site_name = format!("wingerworth");
     let loe_i = format!("{}", 0);
 
-    let trenches = trench::new_trench_layout("centre_line_trenching".to_string(), &site_name, &loe_i);
+    let trenches =
+        trench::new_trench_layout("centre_line_trenching".to_string(), &site_name, &loe_i);
     let features = read_features_geojson(site_name, loe_i).unwrap();
     process_geojson(&features, &trenches.unwrap());
 
@@ -49,7 +50,7 @@ fn match_geometry(geom: &Geometry, trenches: &TrenchPattern) -> bool {
                 .map(|c| {
                     coord! { x: c[0], y: c[1] }
                 })
-                .collect::<Vec<Coord>>();
+                .collect();
             let poly = Polygon::new(LineString(poly1), vec![]);
             if intersects::test(poly, trenches) {
                 true

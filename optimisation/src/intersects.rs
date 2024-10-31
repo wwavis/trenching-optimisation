@@ -13,6 +13,6 @@ pub fn test(polygon_a: Polygon<f64>, trenches: &TrenchPattern) -> bool {
         _ => {
             println!("Trench pattern yet not added");
             return false;
-        },
+        }
     }
 }
