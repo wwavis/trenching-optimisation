@@ -24,18 +24,18 @@ fn main() {
 fn process_geojson(gj: &GeoJson, trenches: &TrenchPattern) {
     match *gj {
         GeoJson::FeatureCollection(ref collection) => {
-            let mut matched = 0;
-            let mut unmatched = 0;
+            let mut features_found = 0;
+            let mut features_missed = 0;
             for feature in &collection.features {
                 if let Some(ref geom) = feature.geometry {
                     if match_geometry(geom, &trenches) {
-                        matched += 1;
+                        features_found += 1;
                     } else {
-                        unmatched += 1;
+                        features_missed += 1;
                     }
                 }
             }
-            println!("Matched: {}, Unmatched: {}", matched, unmatched);
+            println!("Features found: {}, features missed: {}", features_found, features_missed);
         }
         _ => println!("Non FeatureCollection GeoJSON not supported"),
     }
