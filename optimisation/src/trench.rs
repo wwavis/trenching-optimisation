@@ -50,8 +50,8 @@ fn centre_line_trenching(site_outline: &Polygon) -> Vec<TrenchPattern> {
     let centroid = point! { x: centroid.0, y: centroid.1 };
 
     let mut trenches = Vec::new();
-    // rotate 179 times as pattern replicates after
-    for i in 0..179 {
+    // rotate 180 times as pattern replicates after
+    for i in 0..180 {
         let rotated_trench = central_trench.rotate_around_point(i as f64, centroid);
         // cut trench to site outline
         let intersection = site_outline.boolean_op(&rotated_trench, geo::OpType::Intersection);
