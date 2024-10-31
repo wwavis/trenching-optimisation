@@ -1,9 +1,7 @@
 #!/bin/bash
 
-
 # Run the script to group the data by LOE
 set -e
-
 
 raw_geojsons_directory="../../data/raw_geojsons"
 

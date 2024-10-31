@@ -4,7 +4,10 @@ set -e
 
 mkdir -p ../../data/raw_geojsons
 
-shape_directory="../../../Trenchscrits/real_sitedata"
+# Enter filename
+read -p "Enter file path to real_sitedata folder: e.g. (../../../Trenchscrits/real_sitedata)" shape_directory
+
+# shape_directory="../../../Trenchscrits/real_sitedata"
 
 find "$shape_directory" -type f -name "*.shp" | while read -r file; do
     filename=$(basename "$file" .shp)
