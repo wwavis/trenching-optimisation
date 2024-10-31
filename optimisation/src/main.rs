@@ -1,13 +1,12 @@
 mod intersects;
 mod trench;
 
-use geo::{coord, LineString, Polygon};
-use geojson::{GeoJson, Geometry, Value};
+use geo::Polygon;
 use rayon::prelude::*;
 use std::time::Instant;
 
 use trenching_optimisation::{
-    read_all_test_location_data, read_single_features_geojson, read_single_loe_feature,
+    read_all_test_location_data, read_single_test_location_data,
     TrenchPattern,
 };
 
@@ -23,12 +22,11 @@ fn main() {
 
     for test_location in test_locations {
         let trenches = trench::new_trench_layout(trench_type.to_string(), test_location.loe);
-        let features = test_location.features;
         let found_or_missed: Vec<(i32, i32)> = trenches
             .unwrap()
             .into_par_iter()
             .map(|trench| {
-                let (features_found, features_missed) = process_geojson(&features, &trench);
+                let (features_found, features_missed) = count_features_hit_or_missed(&test_location.features, &trench);
                 (features_found, features_missed)
             })
             .collect();
@@ -52,75 +50,37 @@ fn main() {
     println!("Testing {} took: {:?}", trench_type, elapsed_time);
 
     // // Below is for a single LOE
+    // let now = Instant::now();
     // let site_name = format!("Stansted");
     // let loe_i = format!("{}", 0);
 
-    // let loe = read_single_loe_feature(site_name.clone(), loe_i.clone()).unwrap();
+    // let test_location = read_single_test_location_data(site_name, loe_i).unwrap();
 
-    // let trenches = trench::new_trench_layout("centre_line_trenching".to_string(), loe);
-    // let features = read_single_features_geojson(site_name, loe_i).unwrap();
+    // println!("Elapsed time: {:?}", now.elapsed());
+    // let trenches = trench::new_trench_layout(trench_type.to_string(), test_location.loe);
     // // process_geojson(&features, &trenches.unwrap());
-    // let results: Vec<(i32, i32)> = trenches
-    //     .unwrap()
-    //     .into_iter()
-    //     .map(|trench| {
-    //         let (features_found, features_missed) = process_geojson(&features, &trench);
-    //         (features_found, features_missed)
-    //     })
-    //     .collect();
+    // println!("Elapsed time: {:?}", now.elapsed());
+    // let found_or_missed: Vec<(i32, i32)> = trenches
+    //         .unwrap()
+    //         .into_par_iter()
+    //         .map(|trench| {
+    //             let (features_found, features_missed) = count_features_hit_or_missed(&test_location.features, &trench);
+    //             (features_found, features_missed)
+    //         })
+    //         .collect();
 
-    // let elapsed_time = now.elapsed();
-    // println!("Elapsed time: {:?}", elapsed_time);
+    // println!("Elapsed time: {:?}", now.elapsed());
 }
 
-fn process_geojson(gj: &GeoJson, trenches: &TrenchPattern) -> (i32, i32) {
-    match *gj {
-        GeoJson::FeatureCollection(ref collection) => {
-            let mut features_found = 0;
-            let mut features_missed = 0;
-            for feature in &collection.features {
-                if let Some(ref geom) = feature.geometry {
-                    if match_geometry(geom, &trenches) {
-                        features_found += 1;
-                    } else {
-                        features_missed += 1;
-                    }
-                }
-            }
-            // println!(
-            //     "Features found: {}, features missed: {}",
-            //     features_found, features_missed
-            // );
-            (features_found, features_missed)
-        }
-        _ => {
-            println!("Non FeatureCollection GeoJSON not supported");
-            (0, 0)
+fn count_features_hit_or_missed(features: &Vec<Polygon<f64>>, trenches: &TrenchPattern) -> (i32, i32) {
+    let mut features_found = 0;
+    let mut features_missed = 0;
+    for feature in features {
+        if intersects::test(feature, trenches) {
+            features_found += 1;
+        } else {
+            features_missed += 1;
         }
     }
-}
-
-// Process GeoJSON geometries
-fn match_geometry(geom: &Geometry, trenches: &TrenchPattern) -> bool {
-    match geom.value {
-        Value::Polygon(ref polygon) => {
-            let poly1 = polygon[0]
-                .iter()
-                .map(|c| {
-                    coord! { x: c[0], y: c[1] }
-                })
-                .collect();
-            let poly = Polygon::new(LineString(poly1), vec![]);
-            if intersects::test(poly, trenches) {
-                true
-            } else {
-                false
-            }
-        }
-        _ => {
-            // TODO: update this placeholder for other geometry types
-            println!("Matched some other geometry");
-            false
-        }
-    }
+    (features_found, features_missed)
 }
