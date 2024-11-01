@@ -1,9 +1,9 @@
 use geo::{Intersects, Polygon};
-use trenching_optimisation::TrenchPattern;
+use trenching_optimisation::TrenchLayout;
 
-pub fn test(polygon_a: &Polygon<f64>, trenches: &TrenchPattern) -> bool {
+pub fn test(polygon_a: &Polygon<f64>, trenches: &TrenchLayout) -> bool {
     match trenches {
-        TrenchPattern::CentreLine(trenches) => {
+        TrenchLayout::CentreLine(trenches) => {
             if polygon_a.intersects(trenches) {
                 return true;
             } else {
@@ -11,8 +11,7 @@ pub fn test(polygon_a: &Polygon<f64>, trenches: &TrenchPattern) -> bool {
             }
         }
         _ => {
-            println!("Trench pattern yet not added");
-            return false;
+            panic!("Trench pattern not yet added");
         }
     }
 }

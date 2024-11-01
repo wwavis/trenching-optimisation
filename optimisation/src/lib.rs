@@ -6,7 +6,7 @@ use std::io::BufReader;
 use std::time::Instant;
 
 #[derive(Debug)]
-pub enum TrenchPattern {
+pub enum TrenchLayout {
     CentreLine(MultiPolygon<f64>),
     Continuous(MultiPolygon<f64>),
 }
@@ -15,6 +15,14 @@ pub enum TrenchPattern {
 pub struct TestLocation {
     pub loe: Feature,
     pub features: Vec<Polygon<f64>>,
+}
+
+#[derive(Debug)]
+pub struct TrenchConfig {
+    pub layout: String,
+    pub width: f64,
+    pub spacing: f64,
+    pub coverage: f64, // percentage coverage
 }
 
 pub fn read_single_test_location_data(site_name: String, loe_i: String) -> Result<TestLocation> {
