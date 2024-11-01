@@ -18,9 +18,11 @@ pub struct TestLocation {
 }
 
 pub fn read_single_test_location_data(site_name: String, loe_i: String) -> Result<TestLocation> {
+    let now = Instant::now();
     let loe = read_single_loe_feature(site_name.clone(), loe_i.clone())?;
     let gj = read_single_features_geojson(site_name, loe_i)?;
     let features = process_geojson(&gj).unwrap();
+    println!("Reading files took: {:?}", now.elapsed());
     Ok(TestLocation {
         loe: loe,
         features: features,
@@ -73,7 +75,6 @@ pub fn read_all_test_location_data() -> Result<Vec<TestLocation>> {
                     println!("Unable to make polygons for site: {} location: {}", site, i);
                 }
             }
-
         }
     }
     println!("Reading files took: {:?}", now.elapsed());
@@ -121,4 +122,3 @@ fn geometry_to_polygon(geom: &Geometry) -> Option<Polygon<f64>> {
         }
     }
 }
-
