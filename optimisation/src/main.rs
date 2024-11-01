@@ -49,11 +49,11 @@ fn run_on_single_loe(trench_type: &str, site_name: String, loe_i: String) {
             (features_found, features_missed)
         })
         .collect();
-    println!("Calculating features hit took: {:?} \n", now.elapsed());
+    println!("Calculating features hit took: {:?}", now.elapsed());
 }
 
 fn run_on_all_loes(trench_type: &str) {
-    println!("Running on all LOEs");
+    println!("\nRunning on all LOEs");
     let test_locations = read_all_test_location_data().unwrap();
 
     let now = Instant::now();
