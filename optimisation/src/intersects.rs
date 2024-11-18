@@ -10,6 +10,13 @@ pub fn test(polygon_a: &Polygon<f64>, trenches: &TrenchLayout) -> bool {
                 return false;
             }
         }
+        TrenchLayout::Continuous(trenches) => {
+            if polygon_a.intersects(trenches) {
+                return true;
+            } else {
+                return false;
+            }
+        }
         _ => {
             panic!("Trench pattern not yet added");
         }

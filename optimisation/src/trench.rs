@@ -1,9 +1,10 @@
 use geo::{
     coord, Area, BooleanOps, Centroid, EuclideanDistance, LineString, MultiPolygon, Point, Polygon,
-    Rotate,
+    Rotate, Translate,
 };
 use geojson::{Feature, Geometry, Value};
 use trenching_optimisation::{TrenchConfig, TrenchLayout};
+use rayon::prelude::*;
 
 pub fn new_trench_layout(config: &TrenchConfig, loe: Feature) -> Option<Vec<TrenchLayout>> {
     match loe.geometry {
@@ -27,8 +28,10 @@ fn create_trenches(geom: &Geometry, config: &TrenchConfig) -> Vec<TrenchLayout> 
                 })
                 .collect();
             let site_outline = Polygon::new(LineString(polygon_exterior), vec![]);
-            if config.layout == "centre_line_trenching" {
-                return centre_line_trenching(&site_outline, config);
+            if config.layout == "centre_line" {
+                return centre_line(&site_outline, config);
+            } else if config.layout == "continuous" {
+                return continuous(&site_outline, config);
             } else {
                 panic!("Trench layout not recognised");
             }
@@ -39,27 +42,60 @@ fn create_trenches(geom: &Geometry, config: &TrenchConfig) -> Vec<TrenchLayout> 
     }
 }
 
-fn centre_line_trenching(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLayout> {
+fn centre_line(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLayout> {
     let (max_distance, centroid) = max_distance_and_centroid(site_outline);
 
-    let mut trenches = Vec::new();
+    let trench_patterns = (0..180)
+        .into_par_iter()
+        .map(|rotation| {
+            let trench = create_single_trench(centroid, config.width, max_distance * 2.0, rotation);
+
+            // cut trench to site outline
+            let intersection = site_outline.boolean_op(&trench, geo::OpType::Intersection);
+            let percentage_coverage = calculate_coverage(&intersection, site_outline);
+
+            TrenchLayout::CentreLine(intersection)
+            // if (config.coverage - 0.2 <= percentage_coverage)
+            //     & (percentage_coverage <= config.coverage + 0.2)
+            // {
+            //     return TrenchLayout::CentreLine(intersection);
+            // }
+        })
+        .collect();
+    trench_patterns
+}
+
+fn get_centroid_bounds_and_spacing(max_distance: &f64, config: &TrenchConfig) -> ((i32, i32), usize) {
+    let n = (max_distance / config.spacing.unwrap()).floor() as i32;
+    let spacing_i = config.spacing.unwrap() as i32;
+    ((-n*spacing_i, (n+1)*spacing_i), spacing_i as usize)
+}
+
+fn continuous(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLayout> {
+    let (max_distance, centroid) = max_distance_and_centroid(site_outline);
+    let ((start, end), spacing_i) = get_centroid_bounds_and_spacing(&max_distance, config);
+    let site_outline_as_multi = MultiPolygon(vec![site_outline.clone()]);
+
     // rotate 180 times as layout repicates after this
-    for rotation in 0..180 {
-        let trench = create_single_trench(centroid, config.width, max_distance * 2.0, rotation);
+    let trench_patterns = (0..180)
+        .into_par_iter()
+        .map(|rotation| {
+            let mut trenches: Vec<Polygon> = Vec::new();
 
-        // cut trench to site outline
-        let intersection = site_outline.boolean_op(&trench, geo::OpType::Intersection);
-        let percentage_coverage = calculate_coverage(&intersection, site_outline);
+            for x_offset in (start..end).step_by(spacing_i) {
+                let trench_centroid = centroid.translate(x_offset as f64, 0.0).rotate_around_point(rotation as f64, centroid);
+                trenches.push(create_single_trench(trench_centroid, config.width, max_distance * 2.0, rotation));
+            }
+            let trench_pattern = MultiPolygon(trenches);
 
-        // trenches.push(TrenchLayout::CentreLine(intersection));
-        if (config.coverage - 0.2 <= percentage_coverage)
-            & (percentage_coverage <= config.coverage + 0.2)
-        {
-            trenches.push(TrenchLayout::CentreLine(intersection));
-            continue;
-        }
-    }
-    trenches
+            // cut trench to site outline
+            let intersection = site_outline_as_multi.boolean_op(&trench_pattern, geo::OpType::Intersection);
+            let percentage_coverage = calculate_coverage(&intersection, site_outline);
+
+            TrenchLayout::Continuous(intersection)
+        })
+        .collect();
+    trench_patterns
 }
 
 fn max_distance_and_centroid(site_outline: &Polygon) -> (f64, Point) {

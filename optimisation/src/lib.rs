@@ -19,9 +19,10 @@ pub struct TestLocation {
 
 #[derive(Debug)]
 pub struct TrenchConfig {
-    pub layout: String,
-    pub width: f64,
-    pub spacing: f64,
+    pub layout: String, // name of layout
+    pub width: f64, // meters
+    pub length: Option<f64>, // meters
+    pub spacing: Option<f64>, // meters
     pub coverage: f64, // percentage coverage
 }
 

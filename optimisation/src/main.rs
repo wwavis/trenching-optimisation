@@ -11,16 +11,22 @@ use trenching_optimisation::{
 
 fn main() {
     // TODO: get better name than selected_config doesn't sit right
-    let selected_config = TrenchConfig {
-        layout: "centre_line_trenching".to_string(),
+    let centre_line = TrenchConfig {
+        layout: "centre_line".to_string(),
         width: 2.0,
-        spacing: 0.0,
+        length: None,
+        spacing: None,
         coverage: 2.0,
     };
-
-    // let trench_type = "centre_line_trenching";
-    run_on_single_loe(&selected_config, "Heathrow".to_string(), "4".to_string());
-    run_on_all_loes(&selected_config);
+    let continuous = TrenchConfig {
+        layout: "continuous".to_string(),
+        width: 2.0,
+        length: None,
+        spacing: Some(20.0),
+        coverage: 2.0,
+    };
+    run_on_single_loe(&continuous, "Heathrow".to_string(), "4".to_string());
+    run_on_all_loes(&continuous);
 }
 
 fn count_features_hit_or_missed(
@@ -91,8 +97,8 @@ fn run_on_all_loes(selected_config: &TrenchConfig) {
     let percentage_found = total_found as f64 / (total_found + total_missed) as f64 * 100.0;
 
     println!(
-        "Testing {}m wide {} with {}% coverage",
-        selected_config.width, selected_config.layout, selected_config.coverage
+        "Testing {}m wide {}",
+        selected_config.width, selected_config.layout
     );
     println!(
         "Total features found: {}, total features missed: {}, percentage found: {:.2}%",
