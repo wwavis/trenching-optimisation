@@ -10,23 +10,13 @@ use trenching_optimisation::{
 };
 
 fn main() {
-    // TODO: get better name than selected_config doesn't sit right
-    let centre_line = TrenchConfig {
-        layout: "centre_line".to_string(),
-        width: 2.0,
-        length: None,
-        spacing: None,
-        coverage: 2.0,
-    };
-    let continuous = TrenchConfig {
-        layout: "continuous".to_string(),
-        width: 2.0,
-        length: None,
-        spacing: Some(20.0),
-        coverage: 2.0,
-    };
-    run_on_single_loe(&continuous, "Heathrow".to_string(), "4".to_string());
-    run_on_all_loes(&continuous);
+    let centre_line = TrenchConfig::centre_line(2.0, 2.0);
+    let continuous = TrenchConfig::continuous(2.0, 20.0, 2.0);
+    let parallel_array = TrenchConfig::parallel_array(2.0, 30.0, 20.0, 2.0);
+    for config in [centre_line, continuous, parallel_array].iter() {
+        run_on_single_loe(&config, "A355_BeaconsfieldEasternReliefRoad".to_string(), "1".to_string());
+        run_on_all_loes(&config);
+    }
 }
 
 fn count_features_hit_or_missed(
@@ -45,12 +35,12 @@ fn count_features_hit_or_missed(
     (features_found, features_missed)
 }
 
-fn run_on_single_loe(selected_config: &TrenchConfig, site_name: String, loe_i: String) {
+fn run_on_single_loe(config: &TrenchConfig, site_name: String, loe_i: String) {
     println!("Running on single LOE");
     let test_location = read_single_test_location_data(site_name, loe_i).unwrap();
 
     let now = Instant::now();
-    let trenches = trench::new_trench_layout(selected_config, test_location.loe);
+    let trenches = trench::new_trench_layout(config, test_location.loe);
     println!("Creating trenches took: {:?}", now.elapsed());
 
     let now = Instant::now();
@@ -66,7 +56,7 @@ fn run_on_single_loe(selected_config: &TrenchConfig, site_name: String, loe_i: S
     println!("Calculating features hit took: {:?}", now.elapsed());
 }
 
-fn run_on_all_loes(selected_config: &TrenchConfig) {
+fn run_on_all_loes(config: &TrenchConfig) {
     println!("\nRunning on all LOEs");
     let test_locations = read_all_test_location_data().unwrap();
 
@@ -77,7 +67,7 @@ fn run_on_all_loes(selected_config: &TrenchConfig) {
     let mut total_trenches = 0;
 
     for test_location in test_locations {
-        let trenches = trench::new_trench_layout(selected_config, test_location.loe);
+        let trenches = trench::new_trench_layout(config, test_location.loe);
         let found_or_missed: Vec<(i32, i32)> = trenches
             .unwrap()
             .into_par_iter()
@@ -97,8 +87,8 @@ fn run_on_all_loes(selected_config: &TrenchConfig) {
     let percentage_found = total_found as f64 / (total_found + total_missed) as f64 * 100.0;
 
     println!(
-        "Testing {}m wide {}",
-        selected_config.width, selected_config.layout
+        "Testing {}m wide {:?} trenches",
+        config.width, config.layout
     );
     println!(
         "Total features found: {}, total features missed: {}, percentage found: {:.2}%",

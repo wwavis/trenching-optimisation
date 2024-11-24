@@ -6,10 +6,7 @@ use std::io::BufReader;
 use std::time::Instant;
 
 #[derive(Debug)]
-pub enum TrenchLayout {
-    CentreLine(MultiPolygon<f64>),
-    Continuous(MultiPolygon<f64>),
-}
+pub struct TrenchLayout (pub MultiPolygon<f64>);
 
 #[derive(Debug)]
 pub struct TestLocation {
@@ -18,12 +15,64 @@ pub struct TestLocation {
 }
 
 #[derive(Debug)]
+pub enum Layout {
+    CentreLine,
+    Continuous,
+    ParallelArray,
+    StandardGrid,
+    TestPits,
+    RamsgateHarbourArray,
+}
+
+#[derive(Debug)]
 pub struct TrenchConfig {
-    pub layout: String, // name of layout
-    pub width: f64, // meters
-    pub length: Option<f64>, // meters
+    pub layout: Layout,       // name of layout
+    pub width: f64,           // meters
+    pub length: Option<f64>,  // meters
     pub spacing: Option<f64>, // meters
-    pub coverage: f64, // percentage coverage
+    pub coverage: f64,        // percentage coverage
+}
+
+impl TrenchConfig {
+    pub fn centre_line(width: f64, coverage: f64) -> Self {
+        TrenchConfig {
+            layout: Layout::CentreLine,
+            width,
+            length: None,
+            spacing: None,
+            coverage,
+        }
+    }
+    pub fn continuous(width: f64, spacing: f64, coverage: f64) -> Self {
+        assert!(width / 2.0 < spacing, "Spacing too small for width");
+        TrenchConfig {
+            layout: Layout::Continuous,
+            width,
+            length: None,
+            spacing: Some(spacing),
+            coverage,
+        }
+    }
+    pub fn parallel_array(width: f64, length: f64, spacing: f64, coverage: f64) -> Self {
+        assert!(width / 2.0 < spacing, "Spacing too small for width");
+        TrenchConfig {
+            layout: Layout::ParallelArray,
+            width,
+            length: Some(length),
+            spacing: Some(spacing),
+            coverage,
+        }
+    }
+    pub fn standard_grid(width: f64, length: f64, spacing: f64, coverage: f64) -> Self {
+        assert!(width / 2.0 + length / 2.0 < spacing, "Spacing too small for width and length");
+        TrenchConfig {
+            layout: Layout::StandardGrid,
+            width,
+            length: None,
+            spacing: Some(spacing),
+            coverage,
+        }
+    }
 }
 
 pub fn read_single_test_location_data(site_name: String, loe_i: String) -> Result<TestLocation> {
