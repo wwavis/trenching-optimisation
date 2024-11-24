@@ -14,7 +14,7 @@ fn main() {
     let continuous = TrenchConfig::continuous(2.0, 20.0, 2.0);
     let parallel_array = TrenchConfig::parallel_array(2.0, 30.0, 20.0, 2.0);
     for config in [centre_line, continuous, parallel_array].iter() {
-        run_on_single_loe(&config, "A355_BeaconsfieldEasternReliefRoad".to_string(), "1".to_string());
+        run_on_single_loe(&config, "Stansted".to_string(), "1".to_string());
         run_on_all_loes(&config);
     }
 }

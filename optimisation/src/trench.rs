@@ -74,7 +74,8 @@ fn centre_line(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLayou
 
 fn continuous(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLayout> {
     let (max_distance, centroid) = max_distance_and_centroid(site_outline);
-    let ((start, end), spacing) = get_centroid_bounds_and_spacing(&max_distance, config.spacing.unwrap());
+    let ((start, end), spacing) =
+        get_centroid_bounds_and_spacing(&max_distance, config.spacing.unwrap());
 
     let mut trenches: Vec<Polygon> = Vec::new();
 
@@ -92,14 +93,20 @@ fn continuous(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLayout
 
 fn parallel_array(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLayout> {
     let (max_distance, centroid) = max_distance_and_centroid(site_outline);
-    let ((x_start, x_end), x_spacing) = get_centroid_bounds_and_spacing(&max_distance, config.spacing.unwrap());
-    let ((y_start, y_end), y_spacing) = get_centroid_bounds_and_spacing(&max_distance, config.length.unwrap());
+    let ((x_start, x_end), x_spacing) =
+        get_centroid_bounds_and_spacing(&max_distance, config.spacing.unwrap());
+    let ((y_start, y_end), y_spacing) =
+        get_centroid_bounds_and_spacing(&max_distance, config.length.unwrap());
 
     let mut trenches: Vec<Polygon> = Vec::new();
     let mut skip_first_trench_in_y = true;
     for x_offset in (x_start..x_end).step_by(x_spacing) {
         let mut trench_here = true;
-        let y_start_alternate = if skip_first_trench_in_y { y_start + y_spacing as i32 } else { y_start };
+        let y_start_alternate = if skip_first_trench_in_y {
+            y_start + y_spacing as i32
+        } else {
+            y_start
+        };
         for y_offset in (y_start_alternate..y_end).step_by(y_spacing) {
             if trench_here {
                 let trench_centroid = centroid.translate(x_offset as f64, y_offset as f64);
@@ -145,10 +152,7 @@ fn create_single_trench(centroid: Point, width: f64, length: f64, rotation: i32)
     Polygon::new(LineString(trench_exterior), vec![]).rotate_around_point(rotation as f64, centroid)
 }
 
-fn get_centroid_bounds_and_spacing(
-    max_distance: &f64,
-    spacing: f64,
-) -> ((i32, i32), usize) {
+fn get_centroid_bounds_and_spacing(max_distance: &f64, spacing: f64) -> ((i32, i32), usize) {
     let n = (max_distance / spacing).floor() as i32;
     let spacing = spacing as i32;
     ((-n * spacing, (n + 1) * spacing), spacing as usize)

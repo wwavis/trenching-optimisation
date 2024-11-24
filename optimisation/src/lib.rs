@@ -6,7 +6,7 @@ use std::io::BufReader;
 use std::time::Instant;
 
 #[derive(Debug)]
-pub struct TrenchLayout (pub MultiPolygon<f64>);
+pub struct TrenchLayout(pub MultiPolygon<f64>);
 
 #[derive(Debug)]
 pub struct TestLocation {
@@ -64,7 +64,10 @@ impl TrenchConfig {
         }
     }
     pub fn standard_grid(width: f64, length: f64, spacing: f64, coverage: f64) -> Self {
-        assert!(width / 2.0 + length / 2.0 < spacing, "Spacing too small for width and length");
+        assert!(
+            width / 2.0 + length / 2.0 < spacing,
+            "Spacing too small for width and length"
+        );
         TrenchConfig {
             layout: Layout::StandardGrid,
             width,
