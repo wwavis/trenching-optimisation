@@ -51,25 +51,14 @@ fn create_trenches(geom: &Geometry, config: &TrenchConfig) -> Vec<TrenchLayout> 
 
 fn centre_line(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLayout> {
     let (max_distance, centroid) = max_distance_and_centroid(site_outline);
-
-    let trench_patterns = (0..180)
-        .into_par_iter()
-        .map(|rotation| {
-            let trench = create_single_trench(centroid, config.width, max_distance * 2.0, rotation);
-
-            // cut trench to site outline
-            let intersection = site_outline.boolean_op(&trench, geo::OpType::Intersection);
-            let _percentage_coverage = calculate_coverage(&intersection, site_outline);
-
-            TrenchLayout(intersection)
-            // if (config.coverage - 0.2 <= percentage_coverage)
-            //     & (percentage_coverage <= config.coverage + 0.2)
-            // {
-            //     return TrenchLayout::CentreLine(intersection);
-            // }
-        })
-        .collect();
-    trench_patterns
+    let mut trenches: Vec<Polygon> = Vec::new();
+    trenches.push(create_single_trench(
+        centroid,
+        config.width,
+        max_distance * 2.0,
+        0,
+    ));
+    get_rotated_trench_patterns(trenches, 180, centroid, site_outline)
 }
 
 fn continuous(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLayout> {

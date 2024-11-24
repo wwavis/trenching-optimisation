@@ -36,7 +36,7 @@ fn count_features_hit_or_missed(
 }
 
 fn run_on_single_loe(config: &TrenchConfig, site_name: String, loe_i: String) {
-    println!("Running on single LOE");
+    println!("\nRunning {:?} on single LOE", config.layout);
     let test_location = read_single_test_location_data(site_name, loe_i).unwrap();
 
     let now = Instant::now();
@@ -57,7 +57,7 @@ fn run_on_single_loe(config: &TrenchConfig, site_name: String, loe_i: String) {
 }
 
 fn run_on_all_loes(config: &TrenchConfig) {
-    println!("\nRunning on all LOEs");
+    println!("\nRunning {:?} on all LOEs", config.layout);
     let test_locations = read_all_test_location_data().unwrap();
 
     let now = Instant::now();
