@@ -38,6 +38,9 @@ fn create_trenches(geom: &Geometry, config: &TrenchConfig) -> Vec<TrenchLayout> 
                 Layout::ParallelArray => {
                     return parallel_array(&site_outline, config);
                 }
+                Layout::StandardGrid => {
+                    return standard_grid(&site_outline, config);
+                }
                 _ => {
                     panic!("Trench layout: {:?} not recognised", config.layout);
                 }
@@ -112,6 +115,33 @@ fn parallel_array(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLa
         skip_first_trench_in_y = !skip_first_trench_in_y;
     }
     get_rotated_trench_patterns(trenches, 180, centroid, site_outline)
+}
+
+fn standard_grid(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLayout> {
+    let (max_distance, centroid) = max_distance_and_centroid(site_outline);
+    let ((start, end), spacing) =
+        get_centroid_bounds_and_spacing(&max_distance, config.spacing.unwrap());
+
+    let mut trenches: Vec<Polygon> = Vec::new();
+
+    let mut rotate_90;
+    let mut first_rotated = false;
+    for x_offset in (start..end).step_by(spacing) {
+        rotate_90 = first_rotated;
+        for y_offset in (start..end).step_by(spacing) {
+            let rotation = if rotate_90 { 90 } else { 0 };
+            let trench_centroid = centroid.translate(x_offset as f64, y_offset as f64);
+            trenches.push(create_single_trench(
+                trench_centroid,
+                config.width,
+                config.length.unwrap(),
+                rotation,
+            ));
+            rotate_90 = !rotate_90;
+        }
+        first_rotated = !first_rotated;
+    }
+    get_rotated_trench_patterns(trenches, 90, centroid, site_outline)
 }
 
 fn max_distance_and_centroid(site_outline: &Polygon) -> (f64, Point) {

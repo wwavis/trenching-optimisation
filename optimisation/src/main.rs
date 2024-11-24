@@ -13,7 +13,20 @@ fn main() {
     let centre_line = TrenchConfig::centre_line(2.0, 2.0);
     let continuous = TrenchConfig::continuous(2.0, 20.0, 2.0);
     let parallel_array = TrenchConfig::parallel_array(2.0, 30.0, 20.0, 2.0);
-    for config in [centre_line, continuous, parallel_array].iter() {
+    let standard_grid = TrenchConfig::standard_grid(2.0, 30.0, 20.0, 2.0);
+    let grid_with_wide_trenches = TrenchConfig::standard_grid(4.0, 30.0, 40.0, 2.0);
+    let grid_wtth_short_trenches = TrenchConfig::standard_grid(2.0, 20.0, 30.0, 2.0);
+
+    for config in [
+        centre_line,
+        continuous,
+        parallel_array,
+        standard_grid,
+        grid_with_wide_trenches,
+        grid_wtth_short_trenches,
+    ]
+    .iter()
+    {
         run_on_single_loe(&config, "Stansted".to_string(), "1".to_string());
         run_on_all_loes(&config);
     }

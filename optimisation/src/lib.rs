@@ -71,7 +71,7 @@ impl TrenchConfig {
         TrenchConfig {
             layout: Layout::StandardGrid,
             width,
-            length: None,
+            length: Some(length),
             spacing: Some(spacing),
             coverage,
         }
