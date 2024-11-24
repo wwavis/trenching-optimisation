@@ -41,6 +41,9 @@ fn create_trenches(geom: &Geometry, config: &TrenchConfig) -> Vec<TrenchLayout> 
                 Layout::StandardGrid => {
                     return standard_grid(&site_outline, config);
                 }
+                Layout::TestPits => {
+                    return test_pits(&site_outline, config);
+                }
                 _ => {
                     panic!("Trench layout: {:?} not recognised", config.layout);
                 }
@@ -140,6 +143,27 @@ fn standard_grid(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLay
             rotate_90 = !rotate_90;
         }
         first_rotated = !first_rotated;
+    }
+    get_rotated_trench_patterns(trenches, 90, centroid, site_outline)
+}
+
+fn test_pits(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLayout> {
+    let (max_distance, centroid) = max_distance_and_centroid(site_outline);
+    let ((start, end), spacing) =
+        get_centroid_bounds_and_spacing(&max_distance, config.spacing.unwrap());
+
+    let mut trenches: Vec<Polygon> = Vec::new();
+
+    for x_offset in (start..end).step_by(spacing) {
+        for y_offset in (start..end).step_by(spacing) {
+            let trench_centroid = centroid.translate(x_offset as f64, y_offset as f64);
+            trenches.push(create_single_trench(
+                trench_centroid,
+                config.width,
+                config.length.unwrap(),
+                0,
+            ));
+        }
     }
     get_rotated_trench_patterns(trenches, 90, centroid, site_outline)
 }

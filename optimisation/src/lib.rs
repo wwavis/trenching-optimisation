@@ -76,6 +76,15 @@ impl TrenchConfig {
             coverage,
         }
     }
+    pub fn test_pits(diameter: f64, spacing: f64, coverage: f64) -> Self {
+        TrenchConfig {
+            layout: Layout::TestPits,
+            width: diameter,
+            length: Some(diameter),
+            spacing: Some(spacing),
+            coverage,
+        }
+    }
 }
 
 pub fn read_single_test_location_data(site_name: String, loe_i: String) -> Result<TestLocation> {

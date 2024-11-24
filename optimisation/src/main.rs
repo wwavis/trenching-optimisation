@@ -16,6 +16,7 @@ fn main() {
     let standard_grid = TrenchConfig::standard_grid(2.0, 30.0, 20.0, 2.0);
     let grid_with_wide_trenches = TrenchConfig::standard_grid(4.0, 30.0, 40.0, 2.0);
     let grid_wtth_short_trenches = TrenchConfig::standard_grid(2.0, 20.0, 30.0, 2.0);
+    let test_pits = TrenchConfig::test_pits(1.0, 20.0, 2.0);
 
     for config in [
         centre_line,
@@ -24,6 +25,7 @@ fn main() {
         standard_grid,
         grid_with_wide_trenches,
         grid_wtth_short_trenches,
+        test_pits,
     ]
     .iter()
     {
