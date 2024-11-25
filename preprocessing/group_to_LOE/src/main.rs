@@ -43,7 +43,17 @@ fn main() -> Result<()> {
             if let Some(ref geom) = feature.geometry {
                 for (i, loe_polygon) in loes_polygon.iter().enumerate() {
                     if compare_loe_to_feature(loe_polygon.clone(), geom) {
-                        loe_feature_collections[i].push(feature.clone());
+                        let mut feature = feature.clone();
+                        // standardise the Layer names
+                        if feature.contains_property("LANDSCAPE") {
+                            feature.set_property("Layer", feature.property("LANDSCAPE").unwrap().clone());
+                            feature.remove_property("LANDSCAPE");
+                        }
+                        if feature.contains_property("Phase") {
+                            feature.set_property("Layer", feature.property("Phase").unwrap().clone());
+                            feature.remove_property("Phase");
+                        }
+                        loe_feature_collections[i].push(feature);
                     }
                 }
                 number_of_features += 1;
