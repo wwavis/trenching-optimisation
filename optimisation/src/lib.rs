@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use fs_err::File;
 use geo::{coord, LineString, MultiPolygon, Polygon};
 use geojson::{Feature, GeoJson, Geometry, Value};
@@ -87,16 +87,26 @@ impl TrenchConfig {
     }
 }
 
-pub fn read_single_test_location_data(site_name: String, loe_i: String) -> Result<TestLocation> {
+pub fn read_single_test_location_data(
+    site_name: String,
+    loe_i: String,
+    selected_layer: Option<&str>,
+) -> Result<TestLocation> {
     let now = Instant::now();
     let loe = read_single_loe_feature(site_name.clone(), loe_i.clone())?;
-    let gj = read_single_features_geojson(site_name, loe_i)?;
-    let features = process_geojson(&gj).unwrap();
-    println!("Reading files took: {:?}", now.elapsed());
-    Ok(TestLocation {
-        loe: loe,
-        features: features,
-    })
+    let gj = read_single_features_geojson(site_name.clone(), loe_i.clone())?;
+    match process_geojson(&gj, selected_layer) {
+        Some(features) => {
+            println!("Reading files took: {:?}", now.elapsed());
+            Ok(TestLocation { loe, features })
+        }
+        None => Err(anyhow!(
+            "No {:?} at site: {} location: {}",
+            selected_layer,
+            site_name,
+            loe_i
+        )),
+    }
 }
 
 fn read_single_features_geojson(site_name: String, loe_i: String) -> Result<GeoJson> {
@@ -119,7 +129,7 @@ fn read_single_loe_feature(site_name: String, loe_i: String) -> Result<Feature> 
     Ok(feature)
 }
 
-pub fn read_all_test_location_data() -> Result<Vec<TestLocation>> {
+pub fn read_all_test_location_data(selected_layer: Option<&str>) -> Result<Vec<TestLocation>> {
     let now = Instant::now();
     let mut test_locations = Vec::new();
 
@@ -134,7 +144,7 @@ pub fn read_all_test_location_data() -> Result<Vec<TestLocation>> {
         for i in 0..*location_count {
             let loe = read_single_loe_feature(site.to_string(), i.to_string())?;
             let features = read_single_features_geojson(site.to_string(), i.to_string())?;
-            match process_geojson(&features) {
+            match process_geojson(&features, selected_layer) {
                 Some(polygons) => {
                     test_locations.push(TestLocation {
                         loe: loe,
@@ -142,7 +152,7 @@ pub fn read_all_test_location_data() -> Result<Vec<TestLocation>> {
                     });
                 }
                 None => {
-                    println!("Unable to make polygons for site: {} location: {}", site, i);
+                    // println!("Unable to make polygons for site: {} location: {}", site, i);
                 }
             }
         }
@@ -151,11 +161,20 @@ pub fn read_all_test_location_data() -> Result<Vec<TestLocation>> {
     Ok(test_locations)
 }
 
-fn process_geojson(gj: &GeoJson) -> Option<Vec<Polygon<f64>>> {
+fn process_geojson(gj: &GeoJson, selected_layer: Option<&str>) -> Option<Vec<Polygon<f64>>> {
     match *gj {
         GeoJson::FeatureCollection(ref collection) => {
             let mut polygons = Vec::new();
             for feature in &collection.features {
+                match selected_layer {
+                    // Skip features that don't match the selected layer
+                    Some(layer) => {
+                        if feature.property("Layer").unwrap() != layer {
+                            continue;
+                        }
+                    }
+                    None => {}
+                }
                 if let Some(ref geom) = feature.geometry {
                     if let Some(poly) = geometry_to_polygon(geom) {
                         polygons.push(poly);
@@ -164,7 +183,11 @@ fn process_geojson(gj: &GeoJson) -> Option<Vec<Polygon<f64>>> {
                     }
                 }
             }
-            Some(polygons)
+            if polygons.is_empty() {
+                None
+            } else {
+                Some(polygons)
+            }
         }
         _ => {
             println!("Non FeatureCollection GeoJSON not supported");

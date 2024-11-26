@@ -18,6 +18,8 @@ fn main() {
     let grid_wtth_short_trenches = TrenchConfig::standard_grid(2.0, 20.0, 30.0, 2.0);
     let test_pits = TrenchConfig::test_pits(1.0, 20.0, 2.0);
 
+    let selected_layer = Some("Middle Bronze Age");
+
     for config in [
         centre_line,
         continuous,
@@ -29,8 +31,13 @@ fn main() {
     ]
     .iter()
     {
-        run_on_single_loe(&config, "Stansted".to_string(), "1".to_string());
-        run_on_all_loes(&config);
+        run_on_single_loe(
+            &config,
+            "Stansted".to_string(),
+            "0".to_string(),
+            selected_layer,
+        );
+        run_on_all_loes(&config, selected_layer);
     }
 }
 
@@ -50,30 +57,41 @@ fn count_features_hit_or_missed(
     (features_found, features_missed)
 }
 
-fn run_on_single_loe(config: &TrenchConfig, site_name: String, loe_i: String) {
+fn run_on_single_loe(
+    config: &TrenchConfig,
+    site_name: String,
+    loe_i: String,
+    selected_layer: Option<&str>,
+) {
     println!("\nRunning {:?} on single LOE", config.layout);
-    let test_location = read_single_test_location_data(site_name, loe_i).unwrap();
+    let test_location = read_single_test_location_data(site_name, loe_i, selected_layer);
+    match test_location {
+        Ok(test_location) => {
+            let now = Instant::now();
+            let trenches = trench::new_trench_layout(config, test_location.loe);
+            println!("Creating trenches took: {:?}", now.elapsed());
 
-    let now = Instant::now();
-    let trenches = trench::new_trench_layout(config, test_location.loe);
-    println!("Creating trenches took: {:?}", now.elapsed());
-
-    let now = Instant::now();
-    let _: Vec<(i32, i32)> = trenches
-        .unwrap()
-        .into_par_iter()
-        .map(|trench| {
-            let (features_found, features_missed) =
-                count_features_hit_or_missed(&test_location.features, &trench);
-            (features_found, features_missed)
-        })
-        .collect();
-    println!("Calculating features hit took: {:?}", now.elapsed());
+            let now = Instant::now();
+            let _: Vec<(i32, i32)> = trenches
+                .unwrap()
+                .into_par_iter()
+                .map(|trench| {
+                    let (features_found, features_missed) =
+                        count_features_hit_or_missed(&test_location.features, &trench);
+                    (features_found, features_missed)
+                })
+                .collect();
+            println!("Calculating features hit took: {:?}", now.elapsed());
+        }
+        Err(e) => {
+            println!("{:?}", e);
+        }
+    }
 }
 
-fn run_on_all_loes(config: &TrenchConfig) {
+fn run_on_all_loes(config: &TrenchConfig, selected_layer: Option<&str>) {
     println!("\nRunning {:?} on all LOEs", config.layout);
-    let test_locations = read_all_test_location_data().unwrap();
+    let test_locations = read_all_test_location_data(selected_layer).unwrap();
 
     let now = Instant::now();
 
