@@ -15,76 +15,226 @@ pub struct TestLocation {
 }
 
 #[derive(Debug)]
-pub enum Layout {
+pub enum CentreLineDimensions {
+    Width(f64),
+}
+
+#[derive(Debug)]
+pub enum ContinuousDimensions {
+    Width(f64),
+    Spacing(f64),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Rectangle {
+    pub width: f64,
+    pub length: f64,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Line {
+    pub width: f64,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Degree(pub f64);
+
+impl Degree {
+    pub fn new(value: f64) -> Self {
+        Degree(value)
+    }
+}
+
+pub mod array {
+    use crate::Degree;
+    #[derive(Debug, Clone, Copy)]
+    pub enum PatternRotationAxis {
+        ByCell,
+        ByColumn,
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct Configuration {
+        pub base_angle: Degree,
+        pub alternate_angle: Degree,
+        pub pattern_rotation_axis: PatternRotationAxis,
+        pub separated: bool,
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Structure {
+    Parallel(Line),
+    Array(Rectangle, array::Configuration),
+}
+
+impl Structure {
+    pub fn get_rotational_symmetry(self) -> i32 {
+        match self {
+            Structure::Parallel(_) => 180,
+            Structure::Array(rectangle, array_configuration) => {
+                if (rectangle.width == rectangle.length) & !array_configuration.separated {
+                    90
+                } else {
+                    180
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Distribution {
+    Spacing(f64),  // meters
+    Coverage(f64), // percentage coverage
+}
+
+#[derive(Debug)]
+pub enum Pattern {
     CentreLine,
     Continuous,
     ParallelArray,
     StandardGrid,
     TestPits,
-    RamsgateHarbourArray,
+    Herringbone,
+    // RamsgateHarbourArray,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct TrenchConfig {
-    pub layout: Layout,       // name of layout
-    pub width: f64,           // meters
-    pub length: Option<f64>,  // meters
-    pub spacing: Option<f64>, // meters
-    pub coverage: f64,        // percentage coverage
+    // TODO: add shifts in x/y
+    pub structure: Structure,
+    pub distribution: Distribution,
 }
 
 impl TrenchConfig {
-    pub fn centre_line(width: f64, coverage: f64) -> Self {
+    // TODO: add centre_line
+    // TODO: add validate_spacing
+    // pub fn validate_spacing(width: f64, distribution: Distribution) {
+    //     match distribution {
+    //         Distribution::Spacing(spacing) => {
+    //             assert!(width / 2.0 < spacing, "Spacing too small for width");
+    //         }
+    //         _ => {}
+    //     }
+    // }
+
+    pub fn continuous(width: f64, distribution: Distribution) -> Self {
+        match distribution {
+            Distribution::Spacing(spacing) => {
+                assert!(width / 2.0 < spacing, "Spacing too small for width");
+            }
+            _ => {}
+        }
         TrenchConfig {
-            layout: Layout::CentreLine,
-            width,
-            length: None,
-            spacing: None,
-            coverage,
+            structure: Structure::Parallel(Line { width }),
+            distribution,
         }
     }
-    pub fn continuous(width: f64, spacing: f64, coverage: f64) -> Self {
-        assert!(width / 2.0 < spacing, "Spacing too small for width");
+    pub fn parallel_array(width: f64, length: f64, distribution: Distribution) -> Self {
+        match distribution {
+            Distribution::Spacing(spacing) => {
+                assert!(width / 2.0 < spacing, "Spacing too small for width");
+                assert!(length / 2.0 < spacing, "Spacing too small for length");
+            }
+            _ => {}
+        }
         TrenchConfig {
-            layout: Layout::Continuous,
-            width,
-            length: None,
-            spacing: Some(spacing),
-            coverage,
+            structure: Structure::Array(
+                Rectangle { width, length },
+                array::Configuration {
+                    base_angle: Degree::new(0.0),
+                    alternate_angle: Degree::new(0.0),
+                    pattern_rotation_axis: array::PatternRotationAxis::ByCell,
+                    separated: true,
+                },
+            ),
+            distribution,
         }
     }
-    pub fn parallel_array(width: f64, length: f64, spacing: f64, coverage: f64) -> Self {
-        assert!(width / 2.0 < spacing, "Spacing too small for width");
+    pub fn standard_grid(width: f64, length: f64, distribution: Distribution) -> Self {
+        match distribution {
+            Distribution::Spacing(spacing) => {
+                assert!(
+                    width / 2.0 + length / 2.0 < spacing,
+                    "Spacing too small for width and legnth"
+                );
+            }
+            _ => {}
+        }
         TrenchConfig {
-            layout: Layout::ParallelArray,
-            width,
-            length: Some(length),
-            spacing: Some(spacing),
-            coverage,
+            structure: Structure::Array(
+                Rectangle { width, length },
+                array::Configuration {
+                    base_angle: Degree::new(0.0),
+                    alternate_angle: Degree::new(90.0),
+                    pattern_rotation_axis: array::PatternRotationAxis::ByCell,
+                    separated: false,
+                },
+            ),
+            distribution,
         }
     }
-    pub fn standard_grid(width: f64, length: f64, spacing: f64, coverage: f64) -> Self {
-        assert!(
-            width / 2.0 + length / 2.0 < spacing,
-            "Spacing too small for width and length"
-        );
+    pub fn test_pits(width: f64, distribution: Distribution) -> Self {
+        match distribution {
+            Distribution::Spacing(spacing) => {
+                assert!(width / 2.0 < spacing, "Spacing too small for width");
+            }
+            _ => {}
+        }
         TrenchConfig {
-            layout: Layout::StandardGrid,
-            width,
-            length: Some(length),
-            spacing: Some(spacing),
-            coverage,
+            structure: Structure::Array(
+                Rectangle {
+                    width,
+                    length: width,
+                },
+                array::Configuration {
+                    base_angle: Degree::new(0.0),
+                    alternate_angle: Degree::new(0.0),
+                    pattern_rotation_axis: array::PatternRotationAxis::ByCell,
+                    separated: false,
+                },
+            ),
+            distribution,
         }
     }
-    pub fn test_pits(diameter: f64, spacing: f64, coverage: f64) -> Self {
+    pub fn herringbone(width: f64, length: f64, distribution: Distribution) -> Self {
+        // TODO: add validation for herringbone
+        // match distribution {
+        //     Distribution::Spacing(spacing) => {
+        //         assert!(
+        //             width / 2.0 + length / 2.0 < spacing,
+        //             "Spacing too small for width and legnth"
+        //         );
+        //     }
+        //     _ => {}
+        // }
         TrenchConfig {
-            layout: Layout::TestPits,
-            width: diameter,
-            length: Some(diameter),
-            spacing: Some(spacing),
-            coverage,
+            structure: Structure::Array(
+                Rectangle { width, length },
+                array::Configuration {
+                    base_angle: Degree::new(45.0),
+                    alternate_angle: Degree::new(315.0),
+                    pattern_rotation_axis: array::PatternRotationAxis::ByColumn,
+                    separated: false,
+                },
+            ),
+            distribution,
         }
     }
+    // pub fn centre_line_of_width(width: f64) -> Self {
+    //     TrenchConfig {
+    //         structure: Structure::Parallel(Line { width }),
+    //         distribution: Distribution::Spacing(0.0),
+    //     }
+    // }
+
+    // pub fn centre_line_coverage(coverage: f64) -> Self {
+    //     TrenchConfig {
+    //         structure: Structure::Parallel(Line { width: 0.0 }),
+    //         distribution: Distribution::Coverage(coverage),
+    //     }
+    // }
 }
 
 pub fn read_single_test_location_data(

@@ -4,9 +4,12 @@ use geo::{
 };
 use geojson::{Feature, Geometry, Value};
 use rayon::prelude::*;
-use trenching_optimisation::{Layout, TrenchConfig, TrenchLayout};
+use trenching_optimisation::array::{Configuration, PatternRotationAxis};
+use trenching_optimisation::{
+    Degree, Distribution, Rectangle, Structure, TrenchConfig, TrenchLayout,
+};
 
-pub fn new_trench_layout(config: &TrenchConfig, loe: Feature) -> Option<Vec<TrenchLayout>> {
+pub fn create_layouts(config: &TrenchConfig, loe: Feature) -> Option<Vec<TrenchLayout>> {
     match loe.geometry {
         Some(ref geom) => {
             let trenches = create_trenches(geom, config);
@@ -21,6 +24,7 @@ pub fn new_trench_layout(config: &TrenchConfig, loe: Feature) -> Option<Vec<Tren
 fn create_trenches(geom: &Geometry, config: &TrenchConfig) -> Vec<TrenchLayout> {
     match geom.value {
         Value::Polygon(ref polygon) => {
+            // exclude holes as removed in preprocessing
             let polygon_exterior = polygon[0]
                 .iter()
                 .map(|c| {
@@ -28,24 +32,21 @@ fn create_trenches(geom: &Geometry, config: &TrenchConfig) -> Vec<TrenchLayout> 
                 })
                 .collect();
             let site_outline = Polygon::new(LineString(polygon_exterior), vec![]);
-            match config.layout {
-                Layout::CentreLine => {
-                    return centre_line(&site_outline, config);
+            let (max_distance, centroid) = max_distance_and_centroid(&site_outline);
+
+            match config.distribution {
+                Distribution::Spacing(spacing) => {
+                    return spacing_based_layouts(
+                        &site_outline,
+                        *config,
+                        max_distance,
+                        centroid,
+                        spacing,
+                    );
                 }
-                Layout::Continuous => {
-                    return continuous(&site_outline, config);
-                }
-                Layout::ParallelArray => {
-                    return parallel_array(&site_outline, config);
-                }
-                Layout::StandardGrid => {
-                    return standard_grid(&site_outline, config);
-                }
-                Layout::TestPits => {
-                    return test_pits(&site_outline, config);
-                }
-                _ => {
-                    panic!("Trench layout: {:?} not recognised", config.layout);
+                Distribution::Coverage(_) => {
+                    panic!("Coverage not implemented");
+                    // return coverage_based_layouts(&site_outline, *config);
                 }
             }
         }
@@ -55,117 +56,125 @@ fn create_trenches(geom: &Geometry, config: &TrenchConfig) -> Vec<TrenchLayout> 
     }
 }
 
-fn centre_line(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLayout> {
-    let (max_distance, centroid) = max_distance_and_centroid(site_outline);
-    let mut trenches: Vec<Polygon> = Vec::new();
-    trenches.push(create_single_trench(
-        centroid,
-        config.width,
-        max_distance * 2.0,
-        0,
-    ));
-    get_rotated_trench_patterns(trenches, 180, centroid, site_outline)
+fn get_size_of_grid(max_distance: &f64, spacing: &f64) -> i32 {
+    (max_distance / spacing).floor() as i32
 }
 
-fn continuous(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLayout> {
-    let (max_distance, centroid) = max_distance_and_centroid(site_outline);
-    let ((start, end), spacing) =
-        get_centroid_bounds_and_spacing(&max_distance, config.spacing.unwrap());
-
-    let mut trenches: Vec<Polygon> = Vec::new();
-
-    for x_offset in (start..end).step_by(spacing) {
-        let trench_centroid = centroid.translate(x_offset as f64, 0.0);
-        trenches.push(create_single_trench(
-            trench_centroid,
-            config.width,
-            max_distance * 2.0,
-            0,
-        ));
-    }
-    get_rotated_trench_patterns(trenches, 180, centroid, site_outline)
-}
-
-fn parallel_array(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLayout> {
-    let (max_distance, centroid) = max_distance_and_centroid(site_outline);
-    let ((x_start, x_end), x_spacing) =
-        get_centroid_bounds_and_spacing(&max_distance, config.spacing.unwrap());
-    let ((y_start, y_end), y_spacing) =
-        get_centroid_bounds_and_spacing(&max_distance, config.length.unwrap());
-
-    let mut trenches: Vec<Polygon> = Vec::new();
-    let mut skip_first_trench_in_y = true;
-    for x_offset in (x_start..x_end).step_by(x_spacing) {
-        let mut trench_here = true;
-        let y_start_alternate = if skip_first_trench_in_y {
-            y_start + y_spacing as i32
-        } else {
-            y_start
-        };
-        for y_offset in (y_start_alternate..y_end).step_by(y_spacing) {
-            if trench_here {
-                let trench_centroid = centroid.translate(x_offset as f64, y_offset as f64);
-                trenches.push(create_single_trench(
-                    trench_centroid,
-                    config.width,
-                    config.length.unwrap(),
-                    0,
-                ));
+fn trench_of_array_coordinate(
+    x_index: usize,
+    y_index: usize,
+    x_offset: i32,
+    y_offset: i32,
+    centroid: Point,
+    spacing: f64,
+    array_config: &Configuration,
+    rectangle: Rectangle,
+) -> Option<Polygon> {
+    let trench_centroid = centroid.translate(x_offset as f64 * spacing, y_offset as f64 * spacing);
+    let is_alternate_point = (x_index + y_index) % 2 == 0;
+    let rotation = match array_config.pattern_rotation_axis {
+        PatternRotationAxis::ByCell => {
+            if is_alternate_point {
+                array_config.base_angle
+            } else {
+                array_config.alternate_angle
             }
-            // alternate between trench and no trench
-            trench_here = !trench_here;
         }
-        skip_first_trench_in_y = !skip_first_trench_in_y;
+        PatternRotationAxis::ByColumn => {
+            if x_index % 2 == 0 {
+                array_config.base_angle
+            } else {
+                array_config.alternate_angle
+            }
+        }
+    };
+
+    if array_config.separated & is_alternate_point {
+        None
+    } else {
+        Some(create_single_trench(
+            trench_centroid,
+            rectangle.width,
+            rectangle.length,
+            rotation,
+        ))
     }
-    get_rotated_trench_patterns(trenches, 180, centroid, site_outline)
 }
 
-fn standard_grid(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLayout> {
-    let (max_distance, centroid) = max_distance_and_centroid(site_outline);
-    let ((start, end), spacing) =
-        get_centroid_bounds_and_spacing(&max_distance, config.spacing.unwrap());
-
-    let mut trenches: Vec<Polygon> = Vec::new();
-
-    let mut rotate_90;
-    let mut first_rotated = false;
-    for x_offset in (start..end).step_by(spacing) {
-        rotate_90 = first_rotated;
-        for y_offset in (start..end).step_by(spacing) {
-            let rotation = if rotate_90 { 90 } else { 0 };
-            let trench_centroid = centroid.translate(x_offset as f64, y_offset as f64);
-            trenches.push(create_single_trench(
-                trench_centroid,
-                config.width,
-                config.length.unwrap(),
-                rotation,
-            ));
-            rotate_90 = !rotate_90;
+fn spacing_based_layouts(
+    site_outline: &Polygon,
+    config: TrenchConfig,
+    max_distance: f64,
+    centroid: Point,
+    spacing: f64,
+) -> Vec<TrenchLayout> {
+    let n = get_size_of_grid(&max_distance, &spacing);
+    let x_offsets = -n..n + 1;
+    let trenches = match config.structure {
+        Structure::Parallel(line) => {
+            x_offsets
+                .into_par_iter()
+                .map(|x_offset| {
+                    let trench_centroid = centroid.translate(x_offset as f64 * spacing, 0.0);
+                    create_single_trench(
+                        trench_centroid,
+                        line.width,
+                        max_distance * 2.0,
+                        Degree(0.0),
+                    )
+                })
+                .collect()
+            // TODO: test performance of this vs .push() to Vec
         }
-        first_rotated = !first_rotated;
-    }
-    get_rotated_trench_patterns(trenches, 90, centroid, site_outline)
+        Structure::Array(rectangle, array_config) => {
+            let y_offsets = -n..n + 1;
+            x_offsets
+                .into_par_iter()
+                .enumerate()
+                .flat_map(|(x_index, x_offset)| {
+                    y_offsets
+                        .clone()
+                        .into_iter()
+                        .enumerate()
+                        .filter_map(move |(y_index, y_offset)| {
+                            trench_of_array_coordinate(
+                                x_index,
+                                y_index,
+                                x_offset,
+                                y_offset,
+                                centroid,
+                                spacing,
+                                &array_config,
+                                rectangle,
+                            )
+                        })
+                        .collect::<Vec<Polygon>>()
+                })
+                .collect::<Vec<Polygon>>()
+        }
+    };
+    get_rotated_trench_patterns(
+        trenches,
+        config.structure.get_rotational_symmetry(),
+        centroid,
+        site_outline,
+    )
 }
 
-fn test_pits(site_outline: &Polygon, config: &TrenchConfig) -> Vec<TrenchLayout> {
-    let (max_distance, centroid) = max_distance_and_centroid(site_outline);
-    let ((start, end), spacing) =
-        get_centroid_bounds_and_spacing(&max_distance, config.spacing.unwrap());
-
-    let mut trenches: Vec<Polygon> = Vec::new();
-
-    for x_offset in (start..end).step_by(spacing) {
-        for y_offset in (start..end).step_by(spacing) {
-            let trench_centroid = centroid.translate(x_offset as f64, y_offset as f64);
-            trenches.push(create_single_trench(
-                trench_centroid,
-                config.width,
-                config.length.unwrap(),
-                0,
-            ));
-        }
-    }
-    get_rotated_trench_patterns(trenches, 90, centroid, site_outline)
+fn create_single_trench(
+    centroid: Point,
+    width: f64,
+    length: f64,
+    rotation: Degree,
+) -> Polygon<f64> {
+    let trench_exterior = vec![
+        coord! { x: centroid.x() - width / 2.0, y: centroid.y() - length / 2.0 },
+        coord! { x: centroid.x() + width / 2.0, y: centroid.y() - length / 2.0 },
+        coord! { x: centroid.x() + width / 2.0, y: centroid.y() + length / 2.0 },
+        coord! { x: centroid.x() - width / 2.0, y: centroid.y() + length / 2.0 },
+        coord! { x: centroid.x() - width / 2.0, y: centroid.y() - length / 2.0 },
+    ];
+    Polygon::new(LineString(trench_exterior), vec![]).rotate_around_point(rotation.0, centroid)
 }
 
 fn max_distance_and_centroid(site_outline: &Polygon) -> (f64, Point) {
@@ -182,23 +191,6 @@ fn max_distance_and_centroid(site_outline: &Polygon) -> (f64, Point) {
             }
         });
     (max_distance, centroid)
-}
-
-fn create_single_trench(centroid: Point, width: f64, length: f64, rotation: i32) -> Polygon<f64> {
-    let trench_exterior = vec![
-        coord! { x: centroid.x() - width / 2.0, y: centroid.y() - length / 2.0 },
-        coord! { x: centroid.x() + width / 2.0, y: centroid.y() - length / 2.0 },
-        coord! { x: centroid.x() + width / 2.0, y: centroid.y() + length / 2.0 },
-        coord! { x: centroid.x() - width / 2.0, y: centroid.y() + length / 2.0 },
-        coord! { x: centroid.x() - width / 2.0, y: centroid.y() - length / 2.0 },
-    ];
-    Polygon::new(LineString(trench_exterior), vec![]).rotate_around_point(rotation as f64, centroid)
-}
-
-fn get_centroid_bounds_and_spacing(max_distance: &f64, spacing: f64) -> ((i32, i32), usize) {
-    let n = (max_distance / spacing).floor() as i32;
-    let spacing = spacing as i32;
-    ((-n * spacing, (n + 1) * spacing), spacing as usize)
 }
 
 fn calculate_coverage(trench_layout: &MultiPolygon<f64>, site_outline: &Polygon<f64>) -> f64 {
