@@ -105,7 +105,6 @@ fn run_on_single_loe(
 
             let now = Instant::now();
             let _: Vec<(i32, i32)> = trenches
-                .unwrap()
                 .into_par_iter()
                 .map(|trench| {
                     let (features_found, features_missed) =
@@ -135,7 +134,6 @@ fn run_on_all_loes(config: &TrenchConfig, selected_layer: Option<&str>) {
     for test_location in test_locations {
         let trenches = trench::create_layouts(config, test_location.loe);
         let found_or_missed: Vec<(i32, i32)> = trenches
-            .unwrap()
             .into_par_iter()
             .map(|trench| {
                 let (features_found, features_missed) =

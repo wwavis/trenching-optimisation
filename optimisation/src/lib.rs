@@ -10,19 +10,8 @@ pub struct TrenchLayout(pub MultiPolygon<f64>);
 
 #[derive(Debug)]
 pub struct TestLocation {
-    pub loe: Feature,
+    pub loe: Geometry,
     pub features: Vec<Polygon<f64>>,
-}
-
-#[derive(Debug)]
-pub enum CentreLineDimensions {
-    Width(f64),
-}
-
-#[derive(Debug)]
-pub enum ContinuousDimensions {
-    Width(f64),
-    Spacing(f64),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -89,16 +78,16 @@ pub enum Distribution {
     Coverage(f64), // percentage coverage
 }
 
-#[derive(Debug)]
-pub enum Pattern {
-    CentreLine,
-    Continuous,
-    ParallelArray,
-    StandardGrid,
-    TestPits,
-    Herringbone,
-    // RamsgateHarbourArray,
-}
+// #[derive(Debug)]
+// pub enum Pattern {
+//     CentreLine,
+//     Continuous,
+//     ParallelArray,
+//     StandardGrid,
+//     TestPits,
+//     Herringbone,
+//     // RamsgateHarbourArray,
+// }
 
 #[derive(Debug, Clone, Copy)]
 pub struct TrenchConfig {
@@ -269,14 +258,17 @@ fn read_single_features_geojson(site_name: String, loe_i: String) -> Result<GeoJ
     Ok(gj)
 }
 
-fn read_single_loe_feature(site_name: String, loe_i: String) -> Result<Feature> {
+fn read_single_loe_feature(site_name: String, loe_i: String) -> Result<Geometry> {
     let file = File::open(format!(
         "../data/grouped_by_loe/{}/{}/loe.geojson",
         site_name, loe_i
     ))?;
     let reader = BufReader::new(file);
     let feature: Feature = serde_json::from_reader(reader)?;
-    Ok(feature)
+    match feature.geometry {
+        Some(geometry) => Ok(geometry),
+        None => Err(anyhow!("No geometry found in LOE file")),
+    }
 }
 
 pub fn read_all_test_location_data(selected_layer: Option<&str>) -> Result<Vec<TestLocation>> {

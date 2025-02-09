@@ -2,26 +2,14 @@ use geo::{
     coord, Area, BooleanOps, Centroid, EuclideanDistance, LineString, MultiPolygon, Point, Polygon,
     Rotate, Translate,
 };
-use geojson::{Feature, Geometry, Value};
+use geojson::{Geometry, Value};
 use rayon::prelude::*;
 use trenching_optimisation::array::{Configuration, PatternRotationAxis};
 use trenching_optimisation::{
     Degree, Distribution, Rectangle, Structure, TrenchConfig, TrenchLayout,
 };
 
-pub fn create_layouts(config: &TrenchConfig, loe: Feature) -> Option<Vec<TrenchLayout>> {
-    match loe.geometry {
-        Some(ref geom) => {
-            let trenches = create_trenches(geom, config);
-            Some(trenches)
-        }
-        None => {
-            panic!("No LOE geometry found");
-        }
-    }
-}
-
-fn create_trenches(geom: &Geometry, config: &TrenchConfig) -> Vec<TrenchLayout> {
+pub fn create_layouts(config: &TrenchConfig, geom: Geometry) -> Vec<TrenchLayout> {
     match geom.value {
         Value::Polygon(ref polygon) => {
             // exclude holes as removed in preprocessing
@@ -32,14 +20,15 @@ fn create_trenches(geom: &Geometry, config: &TrenchConfig) -> Vec<TrenchLayout> 
                 })
                 .collect();
             let site_outline = Polygon::new(LineString(polygon_exterior), vec![]);
-            let (max_distance, centroid) = max_distance_and_centroid(&site_outline);
+            let centroid = site_outline.centroid().unwrap();
+            let max_distance_from_centroid = get_max_distance_from_centroid(centroid, &site_outline);
 
             match config.distribution {
                 Distribution::Spacing(spacing) => {
                     return spacing_based_layouts(
                         &site_outline,
                         *config,
-                        max_distance,
+                        max_distance_from_centroid,
                         centroid,
                         spacing,
                     );
@@ -56,8 +45,8 @@ fn create_trenches(geom: &Geometry, config: &TrenchConfig) -> Vec<TrenchLayout> 
     }
 }
 
-fn get_size_of_grid(max_distance: &f64, spacing: &f64) -> i32 {
-    (max_distance / spacing).floor() as i32
+fn get_size_of_grid(max_distance_from_centroid: &f64, spacing: &f64) -> i32 {
+    (max_distance_from_centroid / spacing).floor() as i32
 }
 
 fn trench_of_array_coordinate(
@@ -92,7 +81,7 @@ fn trench_of_array_coordinate(
     if array_config.separated & is_alternate_point {
         None
     } else {
-        Some(create_single_trench(
+        Some(plot_trench(
             trench_centroid,
             rectangle.width,
             rectangle.length,
@@ -104,11 +93,11 @@ fn trench_of_array_coordinate(
 fn spacing_based_layouts(
     site_outline: &Polygon,
     config: TrenchConfig,
-    max_distance: f64,
+    max_distance_from_centroid: f64,
     centroid: Point,
     spacing: f64,
 ) -> Vec<TrenchLayout> {
-    let n = get_size_of_grid(&max_distance, &spacing);
+    let n = get_size_of_grid(&max_distance_from_centroid, &spacing);
     let x_offsets = -n..n + 1;
     let trenches = match config.structure {
         Structure::Parallel(line) => {
@@ -116,10 +105,10 @@ fn spacing_based_layouts(
                 .into_par_iter()
                 .map(|x_offset| {
                     let trench_centroid = centroid.translate(x_offset as f64 * spacing, 0.0);
-                    create_single_trench(
+                    plot_trench(
                         trench_centroid,
                         line.width,
-                        max_distance * 2.0,
+                        max_distance_from_centroid * 2.0,
                         Degree(0.0),
                     )
                 })
@@ -161,7 +150,7 @@ fn spacing_based_layouts(
     )
 }
 
-fn create_single_trench(
+fn plot_trench(
     centroid: Point,
     width: f64,
     length: f64,
@@ -177,20 +166,19 @@ fn create_single_trench(
     Polygon::new(LineString(trench_exterior), vec![]).rotate_around_point(rotation.0, centroid)
 }
 
-fn max_distance_and_centroid(site_outline: &Polygon) -> (f64, Point) {
-    let centroid = site_outline.centroid().unwrap();
-    let max_distance = site_outline
+fn get_max_distance_from_centroid(centroid: Point ,site_outline: &Polygon) -> f64 {
+    let max_distance_from_centroid = site_outline
         .exterior()
         .points()
-        .fold(0.0, |max_distance, p| {
+        .fold(0.0, |max_distance_from_centroid, p| {
             let distance = centroid.euclidean_distance(&p);
-            if distance > max_distance {
+            if distance > max_distance_from_centroid {
                 distance
             } else {
-                max_distance
+                max_distance_from_centroid
             }
         });
-    (max_distance, centroid)
+    max_distance_from_centroid
 }
 
 fn calculate_coverage(trench_layout: &MultiPolygon<f64>, site_outline: &Polygon<f64>) -> f64 {
@@ -221,4 +209,5 @@ fn get_rotated_trench_patterns(
         })
         .collect();
     trench_patterns
+    // TODO: return average percentage coverage
 }
