@@ -10,7 +10,7 @@ pub struct TrenchLayout(pub MultiPolygon<f64>);
 
 #[derive(Debug)]
 pub struct TestLocation {
-    pub loe: Geometry,
+    pub limit_of_excavation: Polygon,
     pub features: Vec<Polygon<f64>>,
 }
 
@@ -232,12 +232,12 @@ pub fn read_single_test_location_data(
     selected_layer: Option<&str>,
 ) -> Result<TestLocation> {
     let now = Instant::now();
-    let loe = read_single_loe_feature(site_name.clone(), loe_i.clone())?;
+    let limit_of_excavation = read_single_loe_feature(site_name.clone(), loe_i.clone())?;
     let gj = read_single_features_geojson(site_name.clone(), loe_i.clone())?;
     match process_geojson(&gj, selected_layer) {
         Some(features) => {
             println!("Reading files took: {:?}", now.elapsed());
-            Ok(TestLocation { loe, features })
+            Ok(TestLocation { limit_of_excavation, features })
         }
         None => Err(anyhow!(
             "No {:?} at site: {} location: {}",
@@ -258,7 +258,20 @@ fn read_single_features_geojson(site_name: String, loe_i: String) -> Result<GeoJ
     Ok(gj)
 }
 
-fn read_single_loe_feature(site_name: String, loe_i: String) -> Result<Geometry> {
+fn get_site_outline_of_loe(polygon: Vec<Vec<Vec<f64>>>) -> Polygon {
+    if polygon.len() > 1 {
+        println!("Warning: more than one polygon found for LOE");
+    }
+    let poly_exterior = polygon[0]
+        .iter()
+        .map(|c| {
+            coord! { x: c[0], y: c[1] }
+        })
+        .collect();
+    Polygon::new(LineString(poly_exterior), vec![])
+}
+
+fn read_single_loe_feature(site_name: String, loe_i: String) -> Result<Polygon> {
     let file = File::open(format!(
         "../data/grouped_by_loe/{}/{}/loe.geojson",
         site_name, loe_i
@@ -266,7 +279,17 @@ fn read_single_loe_feature(site_name: String, loe_i: String) -> Result<Geometry>
     let reader = BufReader::new(file);
     let feature: Feature = serde_json::from_reader(reader)?;
     match feature.geometry {
-        Some(geometry) => Ok(geometry),
+        Some(geometry) => {
+            match geometry.value {
+                Value::Polygon(polygon) => {
+                    Ok(get_site_outline_of_loe(polygon))
+                }
+                _ => {
+                    return Err(anyhow!("Geometry is not a polygon"));
+                }
+            }
+        }
+        // Ok(geometry),
         None => Err(anyhow!("No geometry found in LOE file")),
     }
 }
@@ -284,12 +307,12 @@ pub fn read_all_test_location_data(selected_layer: Option<&str>) -> Result<Vec<T
     ];
     for (site, location_count) in sites_location_counts.iter() {
         for i in 0..*location_count {
-            let loe = read_single_loe_feature(site.to_string(), i.to_string())?;
+            let limit_of_excavation = read_single_loe_feature(site.to_string(), i.to_string())?;
             let features = read_single_features_geojson(site.to_string(), i.to_string())?;
             match process_geojson(&features, selected_layer) {
                 Some(polygons) => {
                     test_locations.push(TestLocation {
-                        loe: loe,
+                        limit_of_excavation: limit_of_excavation,
                         features: polygons,
                     });
                 }

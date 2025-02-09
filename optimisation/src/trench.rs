@@ -9,38 +9,29 @@ use trenching_optimisation::{
     Degree, Distribution, Rectangle, Structure, TrenchConfig, TrenchLayout,
 };
 
-pub fn create_layouts(config: &TrenchConfig, geom: Geometry) -> Vec<TrenchLayout> {
-    match geom.value {
-        Value::Polygon(ref polygon) => {
-            // exclude holes as removed in preprocessing
-            let polygon_exterior = polygon[0]
-                .iter()
-                .map(|c| {
-                    coord! { x: c[0], y: c[1] }
-                })
-                .collect();
-            let site_outline = Polygon::new(LineString(polygon_exterior), vec![]);
-            let centroid = site_outline.centroid().unwrap();
-            let max_distance_from_centroid = get_max_distance_from_centroid(centroid, &site_outline);
+pub fn create_layouts(config: &TrenchConfig, limit_of_excavation: Polygon) -> Vec<TrenchLayout> {
+    // exclude holes as removed in preprocessing
+    let centroid = limit_of_excavation.centroid().unwrap();
+    let max_distance_from_centroid = get_max_distance_from_centroid(centroid, &limit_of_excavation);
 
-            match config.distribution {
-                Distribution::Spacing(spacing) => {
-                    return spacing_based_layouts(
-                        &site_outline,
-                        *config,
-                        max_distance_from_centroid,
-                        centroid,
-                        spacing,
-                    );
-                }
-                Distribution::Coverage(_) => {
-                    panic!("Coverage not implemented");
-                    // return coverage_based_layouts(&site_outline, *config);
-                }
-            }
+    match config.distribution {
+        Distribution::Spacing(spacing) => {
+            return spacing_based_layouts(
+                &limit_of_excavation,
+                *config,
+                max_distance_from_centroid,
+                centroid,
+                spacing,
+            );
         }
-        _ => {
-            panic!("LOE geometry not a polygon");
+        Distribution::Coverage(coverage) => {
+            return coverage_based_layouts(
+                &limit_of_excavation,
+                *config,
+                max_distance_from_centroid,
+                centroid,
+                coverage,
+            );
         }
     }
 }
@@ -91,7 +82,7 @@ fn trench_of_array_coordinate(
 }
 
 fn spacing_based_layouts(
-    site_outline: &Polygon,
+    limit_of_excavation: &Polygon,
     config: TrenchConfig,
     max_distance_from_centroid: f64,
     centroid: Point,
@@ -146,7 +137,7 @@ fn spacing_based_layouts(
         trenches,
         config.structure.get_rotational_symmetry(),
         centroid,
-        site_outline,
+        limit_of_excavation,
     )
 }
 
@@ -166,8 +157,8 @@ fn plot_trench(
     Polygon::new(LineString(trench_exterior), vec![]).rotate_around_point(rotation.0, centroid)
 }
 
-fn get_max_distance_from_centroid(centroid: Point ,site_outline: &Polygon) -> f64 {
-    let max_distance_from_centroid = site_outline
+fn get_max_distance_from_centroid(centroid: Point ,limit_of_excavation: &Polygon) -> f64 {
+    let max_distance_from_centroid = limit_of_excavation
         .exterior()
         .points()
         .fold(0.0, |max_distance_from_centroid, p| {
@@ -181,17 +172,17 @@ fn get_max_distance_from_centroid(centroid: Point ,site_outline: &Polygon) -> f6
     max_distance_from_centroid
 }
 
-fn calculate_coverage(trench_layout: &MultiPolygon<f64>, site_outline: &Polygon<f64>) -> f64 {
-    trench_layout.unsigned_area() / site_outline.unsigned_area() * 100.0
+fn calculate_coverage(trench_layout: &MultiPolygon<f64>, limit_of_excavation: &Polygon<f64>) -> f64 {
+    trench_layout.unsigned_area() / limit_of_excavation.unsigned_area() * 100.0
 }
 
 fn get_rotated_trench_patterns(
     trenches: Vec<Polygon>,
     rotations: i32,
     centroid: Point,
-    site_outline: &Polygon,
+    limit_of_excavation: &Polygon,
 ) -> Vec<TrenchLayout> {
-    let site_outline_as_multi = MultiPolygon(vec![site_outline.clone()]);
+    let limit_of_excavation_as_multi = MultiPolygon(vec![limit_of_excavation.clone()]);
 
     let trench_patterns = (0..rotations)
         .into_par_iter()
@@ -201,9 +192,9 @@ fn get_rotated_trench_patterns(
 
             // cut trench to site outline
             let intersection =
-                site_outline_as_multi.boolean_op(&trench_pattern, geo::OpType::Intersection);
+                limit_of_excavation_as_multi.boolean_op(&trench_pattern, geo::OpType::Intersection);
 
-            let _percentage_coverage = calculate_coverage(&intersection, site_outline);
+            let _percentage_coverage = calculate_coverage(&intersection, limit_of_excavation);
 
             TrenchLayout(intersection)
         })

@@ -100,7 +100,7 @@ fn run_on_single_loe(
     match test_location {
         Ok(test_location) => {
             let now = Instant::now();
-            let trenches = trench::create_layouts(config, test_location.loe);
+            let trenches = trench::create_layouts(config, test_location.limit_of_excavation);
             println!("Creating trenches took: {:?}", now.elapsed());
 
             let now = Instant::now();
@@ -132,7 +132,7 @@ fn run_on_all_loes(config: &TrenchConfig, selected_layer: Option<&str>) {
     let mut total_trenches = 0;
 
     for test_location in test_locations {
-        let trenches = trench::create_layouts(config, test_location.loe);
+        let trenches = trench::create_layouts(config, test_location.limit_of_excavation);
         let found_or_missed: Vec<(i32, i32)> = trenches
             .into_par_iter()
             .map(|trench| {
